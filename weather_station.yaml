@@ -1,0 +1,175 @@
+# Project author: Daafip                                                                                             
+# Kit supplied by PCBWay:
+# https://www.pcbway.com/project/shareproject/Solar_Powered_WiFi_Weather_Station_V3_0.html 
+# Code originally from Bearded Tinker, but adapted to work with lower power mqtt and updated with newer esphome version                                                                     
+# GitHub: https://github.com/BeardedTinker/SolarWS                                                                   
+
+substitutions:
+  display_name: weatherstation
+  awake_duration: 30s
+  update_fq: 25s
+  sleep_duration: 5min
+  battery_full: '3.08'
+  battery_empty: '2.492'
+  battery_diff: '0.668' # '${battery_full}-${battery_empty}'
+
+esphome:
+  name: weatherstation
+
+esp32:
+  board: esp-wrover-kit
+
+ota:
+  platform: esphome
+  password: !secret ota_password
+
+globals:
+  - id: ota_mode
+    type: bool
+    initial_value: 'false'
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  fast_connect: true
+  manual_ip:
+    static_ip: !secret static_ip_weather_station
+    gateway: !secret gateway
+    subnet: !secret subnet
+
+  ## Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+    ssid: "${display_name} Fallback Hotspot"
+    password: !secret wifi_password
+
+#### HA API is nice, but more energy? Try mqtt
+# Enable Home Assistant API
+# api:
+#   encryption:
+#     key: !secret weather_station_ota_key
+
+### MQTT
+mqtt:
+  broker: !secret mqtt_ip
+  port: 1883
+  username: !secret mqtt_username
+  password: !secret mqtt_password
+  birth_message:
+  will_message:
+  on_message:
+    - topic: '{display_name}/ota_mode'
+      payload: 'ON'
+      then:
+        - globals.set:
+            id: ota_mode
+            value: 'true'
+    - topic: '{display_name}/ota_mode'
+      payload: 'OFF'
+      then:
+        - globals.set:
+            id: ota_mode
+            value: 'false'
+    - topic: '{display_name}/sensor/weather/state'
+      then:
+        - if:
+            condition:
+              lambda: 'return !id(ota_mode);'
+            then:
+              - deep_sleep.enter: deep_sleep_control
+
+logger:
+
+i2c:
+  sda: 21
+  scl: 22
+  scan: true
+  id: bus_a
+
+one_wire:
+  - platform: gpio
+    pin: GPIO4
+
+
+sensor:
+  - platform: bme280_i2c
+    address: 0x76
+    temperature:
+      name: '${display_name} WS Temperature'
+      oversampling: 4x
+      unit_of_measurement: "°C"
+      icon: "mdi:thermometer"
+      device_class: "temperature"
+      state_class: "measurement"
+      accuracy_decimals: 1      
+    pressure:
+      name: '${display_name} Pressure'
+      oversampling: 4x
+      unit_of_measurement: "hPa"
+      device_class: "pressure"
+      state_class: "measurement"
+    humidity:
+      name: '${display_name} Humidity'
+      oversampling: 4x
+      unit_of_measurement: "%"
+      icon: "mdi:thermometer"
+      device_class: "humidity"
+      state_class: "measurement"
+
+# DS18B20 Dallas temperature sensor
+  - platform: dallas_temp
+    address: 0x5300000082d64f28
+    name: '${display_name} Air Temperature'
+    unit_of_measurement: "°C"
+    icon: "mdi:thermometer"
+    device_class: "temperature"
+    state_class: "measurement"
+    accuracy_decimals: 1    
+
+# BH1750 sensor provides lux vaules
+  - platform: bh1750
+    name: '${display_name} Lux'
+    address: 0x23
+    unit_of_measurement: "lx"
+    icon: "mdi:white-balance-sunny"
+    device_class: "illuminance"
+    state_class: "measurement"
+    update_interval: ${update_fq}
+
+# ADC platform helps track status of battery
+  - platform: adc
+    pin: #GPIO33
+      number: 33
+      allow_other_uses: true
+    name: '${display_name} Battery'
+    unit_of_measurement: "V"
+    icon: "mdi:battery-high"
+    device_class: "voltage"
+    state_class: "measurement"
+    accuracy_decimals: 3
+    attenuation: 11db
+    id: voltage
+#    update_interval: 25s
+
+# Another ADC platform to track battery %
+  - platform: adc
+    pin: #GPIO33
+      number: 33
+      allow_other_uses: true
+    name: '${display_name} Battery %'
+    attenuation: 11db
+    unit_of_measurement: '%'
+    filters:
+      - lambda: |-
+          return ((id(voltage).state - ${battery_empty}) / ${battery_diff} * 100.00);  
+        # return ((id(voltage).state - 2.492) / 0.668 * 100.00);  
+    update_interval: ${update_fq}
+
+### Define length of Deep sleep
+deep_sleep:
+  id: deep_sleep_control
+  sleep_duration: ${sleep_duration}
+  run_duration:
+    default: ${awake_duration}
+    gpio_wakeup_reason: 2s
+  wakeup_pin: GPIO25
+  wakeup_pin_mode: INVERT_WAKEUP

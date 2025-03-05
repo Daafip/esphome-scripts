@@ -1,0 +1,225 @@
+substitutions:
+  # Modify variables based on your settings
+  hostname: "ttgo"
+  devicename: ttgo
+
+esphome:
+  name: ttgo
+
+esp32:
+  board: ttgo-t7-v14-mini32
+  framework:
+    type: arduino
+
+## Enable logging
+logger:
+
+## Enable Home Assistant API
+api:
+  encryption:
+    key: !secret ttgo_ota_key
+
+ota:
+  platform: esphome
+  password: !secret ota_password
+
+wifi:
+  manual_ip:
+    static_ip: !secret static_ip_ttgo
+    gateway: !secret gateway
+    subnet: !secret subnet
+  networks:
+  - ssid: !secret wifi_ssid_boven
+    password: !secret wifi_password_boven
+  - ssid: !secret wifi_ssid
+    password: !secret wifi_password
+
+
+  ## Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+    ssid: "${devicename} Fallback Hotspot"
+    password: !secret wifi_password
+
+captive_portal:
+
+web_server:
+  port: 80
+  auth:
+    username: !secret web_server_username
+    password: !secret web_server_password  
+
+
+switch:
+  - platform: gpio
+    name: "Desk lamp switch"
+    id: ${devicename}_button_input_desk_lamp_switch
+    pin:
+      number: GPIO12
+  - platform: gpio
+    pin:
+      number: GPIO13
+    name: "Bed lamp switch"
+    id: ${devicename}_button_input_bed_lamp_switch
+
+#### to HA
+binary_sensor:
+    ## general system status
+  - platform: status
+    name: "Node Status"
+    id: system_status
+    ## desk lamp
+  - platform: gpio
+    pin:
+      number: GPIO0
+      inverted: true
+      mode:
+        input: true
+        pullup: true
+    name: "Desk lamp switch toggle button"
+    on_press:
+      then:
+        - switch.toggle: ${devicename}_button_input_desk_lamp_switch
+    ## bed lamp: same but different ID
+  - platform: gpio
+    pin:
+      number: GPIO35
+      inverted: true
+    name: "Bed lamp switch toggle button"
+    on_press:
+      then:
+        - switch.toggle: ${devicename}_button_input_bed_lamp_switch
+
+### temp & humidity
+esp32_ble_tracker:
+  scan_parameters:
+    interval: 10s # try with 300ms if you don't have LAN module
+    window: 10s # try with 300ms if you don't have LAN module
+    active: false #true #false
+
+bluetooth_proxy:
+  active: true
+
+
+#sensor:
+  #- platform: pvvx_mithermometer
+  #  mac_address: "A4:C1:38:6F:CB:5C"
+  #  temperature:
+  #    name: "PVVX Temperature"
+  #  humidity:
+  #    name: "PVVX Humidity"
+  #  battery_level:
+  #    name: "PVVX Battery-Level"
+  #  battery_voltage:
+  #    name: "PVVX Battery-Voltage"
+  #  signal_strength:
+  #    name: "PVVX Signal"
+  #- platform: internal_temperature
+  #  name: "Internal Temperature"
+  #  update_interval: 20s
+
+
+### MQTT
+
+
+# mqtt:
+#   broker: !secret mqtt_ip
+#   port: 1883
+#   username: !secret mqtt_username
+#   password: !secret mqtt_password
+
+
+# text_sensor:
+#   - platform: mqtt_subscribe
+#     name: "Data from bedlamp"
+#     id: bedlampstatus
+#     topic: stat/lamp_bed/POWER
+#   - platform: mqtt_subscribe
+#     name: "Data from desklamp"
+#     id: desklampstatus
+#     topic: stat/lamp_bureau/POWER
+
+# ### adding screen 
+# color:
+#   - id: my_red
+#     red: 100%
+#     green: 0%
+#     blue: 0%
+#   - id: my_yellow
+#     red: 100%
+#     green: 100%
+#     blue: 0%
+#   - id: my_green
+#     red: 0%
+#     green: 100%
+#     blue: 0%
+#   - id: my_blue
+#     red: 0%
+#     green: 0%
+#     blue: 100%
+#   - id: my_gray
+#     red: 50%
+#     green: 50%
+#     blue: 50%
+
+# font:
+#   - file: "Helvetica.ttf"
+#     id: helvetica_48
+#     size: 48
+#   - file: "Helvetica.ttf"
+#     id: helvetica_24
+#     size: 24
+#   - file: "Helvetica.ttf"
+#     id: helvetica_12
+#     size: 12
+#   - file: "Helvetica.ttf"
+#     id: helvetica_16
+#     size: 16
+
+# ### Allow dimmable control of the backlight (pin GPIO4)
+# output:
+#   - platform: ledc
+#     pin: GPIO4
+#     id: gpio4
+
+# light:
+#   - platform: monochromatic
+#     output: gpio4
+#     name: "Backlight"
+
+# time:
+#   - platform: homeassistant
+#     id: esptime
+
+# spi:
+#   clk_pin: GPIO18
+#   mosi_pin: GPIO19
+
+# display:
+#   - platform: st7789v
+#     model: TTGO TDisplay 135x240
+#     cs_pin: GPIO5
+#     dc_pin: GPIO16
+#     reset_pin: GPIO23
+#     rotation: 270
+# #     lambda: |-
+# #       it.rectangle(0,  0, it.get_width(), it.get_height(), id(my_blue));
+# #       it.rectangle(0, 20, it.get_width(), it.get_height(), id(my_blue));   // header bar
+
+# #       // time & date 
+# #       it.strftime((240 / 2), (140 / 4) * 1 + 5, id(helvetica_16), id(my_gray), TextAlign::CENTER, "%m-%d-%H:%M:%S", id(esptime).now());
+
+# #       // mqtt:
+# #       it.printf((240 / 2), (140 / 4) * 2 + 5, id(helvetica_16), id(my_gray),TextAlign::CENTER, "bed: %s",id(bedlampstatus).state.c_str());
+# #       it.printf((240 / 2), (140 / 4) * 3 + 5, id(helvetica_16), id(my_gray),TextAlign::CENTER, "desk: %s",id(desklampstatus).state.c_str());
+
+# #       it.print(5, 5, id(helvetica_12), id(my_yellow), TextAlign::TOP_LEFT, "ESPHome");
+
+# #       // Comment out the above lines to see the image without text overlaid
+# #       // it.image(0, 0, id(my_image));
+
+# #       if (id(system_status).state) {
+# #         it.print(235, 5, id(helvetica_12), id(my_green), TextAlign::TOP_RIGHT, "Online");
+# #       }
+# #       else {
+# #         it.print(235, 5, id(helvetica_12), id(my_red), TextAlign::TOP_RIGHT, "Offline");
+# #       }

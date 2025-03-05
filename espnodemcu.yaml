@@ -1,0 +1,120 @@
+substitutions:
+  # easily modify variables
+  hostname: "espnodemcu"
+  devicename: espnodemcu
+
+esphome:
+  name: espnodemcu
+  friendly_name: espNodeMCU
+
+esp32:
+  board: nodemcu-32s
+
+# Enable logging
+logger:
+
+# Enable Home Assistant API
+api:
+  encryption:
+    key: !secret espnodemcu_ota_key
+
+ota:
+  platform: esphome
+  password: !secret ota_password
+
+wifi:
+  manual_ip:
+    static_ip: !secret static_ip_espnodemcu
+    gateway: !secret gateway
+    subnet: !secret subnet
+  networks:
+  - ssid: !secret wifi_ssid_boven
+    password: !secret wifi_password_boven
+  - ssid: !secret wifi_ssid
+    password: !secret wifi_password
+
+  ## Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+    ssid: "${devicename} Fallback Hotspot"
+    password: !secret wifi_password
+
+captive_portal:
+
+web_server:
+  port: 80
+  auth:
+    username: !secret web_server_username
+    password: !secret web_server_password
+### function: 
+
+# esp32_ble_beacon:
+#   type: iBeacon
+#   uuid: '0614d499-89a0-03f6-ac4a-0cb70b550956'
+
+
+# bluetooth_proxy:
+#   active: true
+
+i2c:
+  sda: 21
+  scl: 22
+  scan: true
+  id: bus_a
+
+### extra device info
+sensor:
+  # - platform: adc
+  #   pin: GPIO36
+  #   name: "Soil Moisture"
+  #   update_interval: 3s
+  #   unit_of_measurement: "v"
+    # filters:
+    # - median:
+    #     window_size: 7
+    #     send_every: 4
+    #     send_first_at: 1
+    # - calibrate_linear:
+    #     - 0.85 -> 0.00
+    #     - 0.44 -> 100.00
+    # - lambda: |
+    #     if (x < 0) return 0; 
+    #     else if (x > 100) return 100;
+    #     else return (x);
+  
+  #### sensor foer temp  
+  - platform: bmp280_i2c
+    i2c_id: bus_a
+    address: 0x76
+    temperature:
+      name: "BMP280 Temperature"
+      oversampling: 16x
+    pressure:
+      name: "BMP280 Pressure"
+    update_interval: 60s
+      
+  - platform: bh1750
+    name: "BH1750 Illuminance"
+    i2c_id: bus_a
+    address: 0x23
+    update_interval: 30s
+
+  - platform: wifi_signal
+    name: ${devicename} wifi signal
+    update_interval: 600s
+
+time:
+  - platform: homeassistant
+    id: homeassistant_time
+
+# Text sensors with general information.
+text_sensor:
+  # Expose ESPHome version as sensor.
+  - platform: version
+    name: $devicename Version
+  # Expose WiFi information as sensors.
+  - platform: wifi_info
+    ip_address:
+      name: $devicename IP
+    bssid:
+      name: $devicename BSSID
+
