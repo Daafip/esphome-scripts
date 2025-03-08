@@ -51,9 +51,15 @@ web_server:
 #   type: iBeacon
 #   uuid: '0614d499-89a0-03f6-ac4a-0cb70b550956'
 
+### temp & humidity
+esp32_ble_tracker:
+  scan_parameters:
+    interval: 1100ms
+    window: 1100ms
+    active: true
 
-# bluetooth_proxy:
-#   active: true
+bluetooth_proxy:
+  active: true
 
 i2c:
   sda: 21
@@ -81,17 +87,18 @@ sensor:
     #     else if (x > 100) return 100;
     #     else return (x);
   
-  #### sensor foer temp  
+  #### sensor for temp  
   - platform: bmp280_i2c
     i2c_id: bus_a
     address: 0x76
     temperature:
       name: "BMP280 Temperature"
       oversampling: 16x
+      filters:
+        offset: -3.9
     pressure:
       name: "BMP280 Pressure"
-    update_interval: 60s
-      
+    update_interval: 60s   
   - platform: bh1750
     name: "BH1750 Illuminance"
     i2c_id: bus_a

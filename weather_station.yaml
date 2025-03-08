@@ -9,9 +9,9 @@ substitutions:
   awake_duration: 30s
   update_fq: 25s
   sleep_duration: 5min
-  battery_full: '3.08'
-  battery_empty: '2.492'
-  battery_diff: '0.668' # '${battery_full}-${battery_empty}'
+  battery_full: '2.94'
+  battery_empty: '2.227'
+  battery_diff: '0.713' # '${battery_full}-${battery_empty}'
 
 esphome:
   name: weatherstation
@@ -32,6 +32,7 @@ wifi:
   ssid: !secret wifi_ssid
   password: !secret wifi_password
   fast_connect: true
+  power_save_mode: LIGHT
   manual_ip:
     static_ip: !secret static_ip_weather_station
     gateway: !secret gateway
@@ -78,6 +79,8 @@ mqtt:
               - deep_sleep.enter: deep_sleep_control
 
 logger:
+  baud_rate: 0
+  level: NONE
 
 i2c:
   sda: 21
@@ -146,7 +149,7 @@ sensor:
     device_class: "voltage"
     state_class: "measurement"
     accuracy_decimals: 3
-    attenuation: 11db
+    attenuation: auto
     id: voltage
 #    update_interval: 25s
 
@@ -156,7 +159,7 @@ sensor:
       number: 33
       allow_other_uses: true
     name: '${display_name} Battery %'
-    attenuation: 11db
+    attenuation: auto
     unit_of_measurement: '%'
     filters:
       - lambda: |-
