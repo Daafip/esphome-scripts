@@ -22,6 +22,10 @@ ota:
   password: !secret ota_password_esp01s
 
 wifi:
+  manual_ip:
+    static_ip: !secret static_ip_esp01s
+    gateway: !secret gateway
+    subnet: !secret subnet
   networks:
   - ssid: !secret wifi_ssid_boven
     password: !secret wifi_password_boven
