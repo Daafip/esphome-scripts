@@ -14,9 +14,11 @@ ESP32-cam config
 ## espnodemcu
 Temperature, pressure, moisture sensor
 
-## ttgo
+## espnodemcu2
 Simple bluetooth proxy
 
+## ttgo
+battery powered watermeter reader: except it uses too much battery. 
 
 ## vindriktning
 Air quality using [ikea hack](https://style.oversubstance.net/2021/08/diy-use-an-ikea-vindriktning-air-quality-sensor-in-home-assistant-with-esphome/)
