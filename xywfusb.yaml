@@ -29,10 +29,10 @@ wifi:
   power_save_mode: HIGH
   ssid: !secret wifi_ssid
   password: !secret wifi_password
-  manual_ip:
-    static_ip: !secret static_ip_xywfusb
-    gateway: !secret gateway
-    subnet: !secret subnet
+  # manual_ip:
+  #   static_ip: !secret static_ip_xywfusb
+  #   gateway: !secret gateway
+  #   subnet: !secret subnet
   ap:
     ssid: "${friendly_name} Fallback Hotspot"
     password: !secret wifi_password

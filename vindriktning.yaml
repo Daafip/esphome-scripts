@@ -23,10 +23,10 @@ ota:
   password: !secret ota_password
 
 wifi:
-  manual_ip:
-    static_ip: !secret static_ip_vindriktning
-    gateway: !secret gateway
-    subnet: !secret subnet
+    # manual_ip:
+    #   static_ip: !secret static_ip_vindriktning
+    #   gateway: !secret gateway
+    #   subnet: !secret subnet
   networks:
   - ssid: !secret wifi_ssid_boven
     password: !secret wifi_password_boven
