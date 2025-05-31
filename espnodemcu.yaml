@@ -95,7 +95,7 @@ sensor:
       name: "BMP280 Temperature"
       oversampling: 16x
       filters:
-        offset: -3.9
+        offset: -7.16
     pressure:
       name: "BMP280 Pressure"
     update_interval: 60s   
