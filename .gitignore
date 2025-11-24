@@ -4,3 +4,6 @@
 /.esphome/
 /secrets.yaml
 hidden_*
+# pixi environments
+.pixi/*
+!.pixi/config.toml
