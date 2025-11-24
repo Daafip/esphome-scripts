@@ -8,6 +8,8 @@ esphome:
 
 esp32:
   board: esp32dev
+  framework:
+    type: arduino
 
 ## Enable logging
 logger:
@@ -45,6 +47,7 @@ web_server:
     username: !secret web_server_username
     password: !secret web_server_password
 
+psram:
 
 esp32_camera:
   external_clock:
