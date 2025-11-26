@@ -50,17 +50,14 @@ web_server:
 #### my components  above ####
 # from 
 # https://github.com/patrickcollins12/esphome-fan-controller/blob/master/console-fan.yaml
-# START THE FAN CONTROLLER SETUP
+# START THE FAN CONTROLLER SETUP, but combined with other stuff from:
+# https://community.home-assistant.io/t/pwm-fan-controller/433316
+# and the lovely claude code
 
 sensor:
   # Every time the fan speed is updated, this sensor will
   # also be updated for displaying on the frontend. 
   # See proxy_output.
-  - platform: template
-    name: "Fan Speed (PWM Voltage)"
-    unit_of_measurement: "%"
-    id: fan_speed_pwm_voltage
-  
   - platform: wifi_signal
     name: ${devicename} wifi signal
     update_interval: 600s
@@ -69,9 +66,14 @@ sensor:
     pin: 
       number: GPIO25   # Connect to any input PIN on the ESP
       mode: INPUT_PULLUP
+      ##In file included from src/esphome/components/pulse_counter/pulse_counter_sensor.h:10,
+      ##    from src/esphome/components/pulse_counter/pulse_counter_sensor.cpp:1:
+      ##  C:/Users/david/.platformio/packages/framework-espidf/components/driver/deprecated/driver/pcnt.h:15:2: warning:
+      ##warning "legacy pcnt driver is deprecated, please migrate to use driver/pulse_cnt.h" [-Wcpp]
+      ##15 | #warning "legacy pcnt driver is deprecated, please migrate to use driver/pulse_cnt.h"
     unit_of_measurement: 'RPM'
     id: fan_speed
-    name: ${devicename} Fan Speed 1
+    name: ${devicename} Fan Speed 
     accuracy_decimals: 0
     filters:
       - multiply: 0.5  # Depending
@@ -81,7 +83,7 @@ output:
   # Wire this pin (13) into the PWM pin of your 12v fan
   # ledc is the name of the pwm output system on an esp32
   - platform: ledc
-    id: console_fan_speed
+    id: fan_set_speed
     pin: GPIO13
 
     # 25KHz is standard PC fan frequency, minimises buzzing
@@ -103,24 +105,30 @@ output:
   # otherwise use the PID control value.
   # Then publish the result to the fan (ledc) and 
   # also publish to the template output sensor
+  # - platform: template
+  #   id: proxy_output
+  #   type: float
+  #   write_action:
+  #     lambda: |-
+  #       float write_val = 
+  #           id(fan_set_speed_value).state / 100.0;
+  #       id(fan_set_speed).set_level(write_val);
+          
+number:
   - platform: template
-    id: proxy_output
-    type: float
-    write_action:
-      lambda: |-
-        float write_val = 
-          (id(manual_fan_control).state) ?
-            id(manual_fan_control).speed / 100.0 : state*1.0;
-        id(console_fan_speed).set_level(write_val);
-        id(fan_speed_pwm_voltage).publish_state(write_val*100.0);
-
-# If you turn this on, you can manually set the fan speed.
-# The PID will be ignored. This is done via the proxy_output.
-fan:
-  - platform: speed
-    id: manual_fan_control
-    output: proxy_output
-    name: "Manual Fan Speed"
+    name: "Fan Speed Override"
+    id: fan_set_speed_value
+    internal: false
+    max_value: 100.0
+    min_value: 0.0
+    step: 10
+    optimistic: true
+    mode: slider
+    on_value: 
+      then:
+        - lambda: |-
+            float write_val = x / 100.0;
+            id(fan_set_speed).set_level(write_val);
 
 
 time:
