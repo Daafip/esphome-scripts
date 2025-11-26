@@ -52,7 +52,7 @@ web_server:
 # https://github.com/patrickcollins12/esphome-fan-controller/blob/master/console-fan.yaml
 # START THE FAN CONTROLLER SETUP, but combined with other stuff from:
 # https://community.home-assistant.io/t/pwm-fan-controller/433316
-# and the lovely claude code
+# and the ofc claude code
 
 sensor:
   # Every time the fan speed is updated, this sensor will
@@ -99,21 +99,6 @@ output:
   # Read the Tacho PIN and show measured RPM as a sensor (only with 4-pin PWM fans!)
   # See instructions here: https://esphome.io/components/sensor/pulse_counter.html
   
-
-  # This proxy output takes its input
-  # if the manual fan control is on, use the level from that
-  # otherwise use the PID control value.
-  # Then publish the result to the fan (ledc) and 
-  # also publish to the template output sensor
-  # - platform: template
-  #   id: proxy_output
-  #   type: float
-  #   write_action:
-  #     lambda: |-
-  #       float write_val = 
-  #           id(fan_set_speed_value).state / 100.0;
-  #       id(fan_set_speed).set_level(write_val);
-          
 number:
   - platform: template
     name: "Fan Speed Override"
