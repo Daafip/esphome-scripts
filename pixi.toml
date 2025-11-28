@@ -5,11 +5,10 @@ platforms = ["linux-64", "win-64"]
 version = "0.1.0"
 
 [tasks]
-#esphome = {python -m esphome}
 
 [dependencies]
 python="3.13.*"
 
 # https://github.com/esphome/esphome
 [pypi-dependencies]
-esphome="==2025.11.1"
+esphome="==2025.11.2"
