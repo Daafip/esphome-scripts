@@ -9,7 +9,8 @@ esphome:
 
 esp32:
   board: nodemcu-32s
-
+  framework: 
+    type: esp-idf
 # Enable logging
 logger:
 
@@ -78,9 +79,10 @@ text_sensor:
   - platform: version
     name: $devicename Version
   # Expose WiFi information as sensors.
-  - platform: wifi_info
+   - platform: wifi_info
     ip_address:
       name: $devicename IP
+      internal: True
     bssid:
       name: $devicename BSSID
-
+      internal: True

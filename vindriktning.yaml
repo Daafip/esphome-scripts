@@ -97,5 +97,7 @@ text_sensor:
   - platform: wifi_info
     ip_address:
       name: $devicename IP
+      internal: True
     bssid:
       name: $devicename BSSID
+      internal: True
