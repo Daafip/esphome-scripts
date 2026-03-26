@@ -5,6 +5,7 @@ platforms = ["linux-64", "win-64"]
 version = "0.1.0"
 
 [tasks]
+update = {cmd="python scripts/update_esphome.py"}
 
 [dependencies]
 python="3.13.*"
