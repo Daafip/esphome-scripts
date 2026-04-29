@@ -1,0 +1,116 @@
+# ============================================================================
+# DIYR Fan Firmware — ESPHome (offline build)
+# Direct port of the Arduino code: global FanState + two duty levels.
+# No fan abstraction. Matches the original sketch's structure exactly.
+# ============================================================================
+
+esphome:
+  name: diyr-fan
+  comment: "DIYR Fan — direct duty control, mirrors Arduino sketch"
+
+esp32:
+  board: esp32-s3-devkitc-1
+  framework:
+    type: arduino
+  variant: ESP32S3 # optional, usually auto-detected
+
+logger:
+  baud_rate: 115200
+  level: DEBUG
+
+# ----------------------------------------------------------------------------
+# FanState — same role as `int FanState` in the Arduino code.
+# 0 = idle (1/1023 duty), 1 = running (200/1023 duty).
+# ----------------------------------------------------------------------------
+globals:
+- id: fan_state
+  type: int
+  restore_value: no
+  initial_value: '0'
+
+# ----------------------------------------------------------------------------
+# PWM output. The safety ceiling lives in max_power: set_level(1.0) maps to
+# max_power, set_level(0.0) maps to min_power. So the lambdas below only ever
+# use 0.0 / 1.0, and the duty cycle physically cannot exceed 19.55%.
+# ----------------------------------------------------------------------------
+output:
+- platform: ledc
+  pin: GPIO12
+  id: fan_pwm
+  frequency: "20000Hz"
+  channel: 0
+  max_power: 0.1955 # 200/1023 — DO NOT raise
+  min_power: 0.000978 # 1/1023
+
+# ----------------------------------------------------------------------------
+# RPWM held low (BTS7960 in single-direction mode).
+# ----------------------------------------------------------------------------
+switch:
+- platform: gpio
+  pin: GPIO13
+  id: rpwm_low
+  restore_mode: ALWAYS_OFF
+  internal: true
+
+# ----------------------------------------------------------------------------
+# Touch hub.
+# ----------------------------------------------------------------------------
+esp32_touch:
+  setup_mode: false
+
+# ----------------------------------------------------------------------------
+# Inputs. Both call the same toggle script, so behaviour is identical
+# regardless of which one fires.
+# ----------------------------------------------------------------------------
+binary_sensor:
+- platform: esp32_touch
+  name: "Heatsink Touch"
+  id: heatsink_touch
+  pin: GPIO1
+  threshold: 65
+  filters:
+  - delayed_on: 50ms
+  on_press:
+    then:
+    - script.execute: toggle_fan
+
+- platform: gpio
+  name: "Boot Button"
+  id: boot_button
+  pin:
+    number: GPIO0
+    mode:
+      input: true
+      pullup: true
+    inverted: true
+  filters:
+  - delayed_on: 20ms
+  on_press:
+    then:
+    - script.execute: toggle_fan
+
+# ----------------------------------------------------------------------------
+# Toggle script — direct equivalent of the Arduino toggletasko + pwmtasko.
+#
+# Arduino:                     ESPHome:
+#   FanState = (FanState+1)%2  →  id(fan_state) = (id(fan_state)+1) % 2
+#   ledcWrite(ch, 1)   (off)   →  output.set_level: 0.0  → min_power (0.098%)
+#   ledcWrite(ch, 200) (on)    →  output.set_level: 1.0  → max_power (19.55%)
+# ----------------------------------------------------------------------------
+script:
+- id: toggle_fan
+  then:
+  - lambda: 'id(fan_state) = (id(fan_state) + 1) % 2;'
+  - if:
+      condition:
+        lambda: 'return id(fan_state) == 1;'
+      then:
+      - output.set_level:
+          id: fan_pwm
+          level: 1.0
+      - logger.log: "Fan ON  (duty ~19.55%)"
+      else:
+      - output.set_level:
+          id: fan_pwm
+          level: 0.0
+      - logger.log: "Fan OFF (duty ~0.098%)"
