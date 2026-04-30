@@ -51,77 +51,84 @@ wifi:
 #   auth:
 #     username: !secret web_server_username
 #     password: !secret web_server_password  
+esp32_ble_tracker:
+  scan_parameters:
+    interval: 1100ms
+    window: 1100ms
+    active: true
 
+bluetooth_proxy:
+  active: true
 
-switch:
-  - platform: gpio
-    name: "Desk lamp switch"
-    id: ${devicename}_button_input_desk_lamp_switch
-    pin:
-      number: GPIO12
-  - platform: gpio
-    pin:
-      number: GPIO13
-    name: "Bed lamp switch"
-    id: ${devicename}_button_input_bed_lamp_switch
+# switch:
+#   - platform: gpio
+#     name: "Desk lamp switch"
+#     id: ${devicename}_button_input_desk_lamp_switch
+#     pin:
+#       number: GPIO12
+#   - platform: gpio
+#     pin:
+#       number: GPIO13
+#     name: "Bed lamp switch"
+#     id: ${devicename}_button_input_bed_lamp_switch
 
 #### to HA - legacy but funny ya know
-binary_sensor:
-    ## general system status
-  - platform: status
-    name: "Node Status"
-    id: system_status
-    ## desk lamp
-  - platform: gpio
-    pin:
-      number: GPIO0
-      inverted: true
-      mode:
-        input: true
-        pullup: true
-    name: "Desk lamp switch toggle button"
-    on_press:
-      then:
-        - switch.toggle: ${devicename}_button_input_desk_lamp_switch
-    ## bed lamp: same but different ID
-  - platform: gpio
-    pin:
-      number: GPIO35
-      inverted: true
-    name: "Bed lamp switch toggle button"
-    on_press:
-      then:
-        - switch.toggle: ${devicename}_button_input_bed_lamp_switch
+# binary_sensor:
+#     ## general system status
+#   - platform: status
+#     name: "Node Status"
+#     id: system_status
+#     ## desk lamp
+#   - platform: gpio
+#     pin:
+#       number: GPIO0
+#       inverted: true
+#       mode:
+#         input: true
+#         pullup: true
+#     name: "Desk lamp switch toggle button"
+#     on_press:
+#       then:
+#         - switch.toggle: ${devicename}_button_input_desk_lamp_switch
+#     ## bed lamp: same but different ID
+#   - platform: gpio
+#     pin:
+#       number: GPIO35
+#       inverted: true
+#     name: "Bed lamp switch toggle button"
+#     on_press:
+#       then:
+#         - switch.toggle: ${devicename}_button_input_bed_lamp_switch
 
-sensor:
-  - platform: adc
-    pin: GPIO34
-    name: "Battery Voltage ${devicename}"
-    update_interval: 30s
-    accuracy_decimals: 3
-    attenuation: auto # auto is recommended, otherwise 11db
-    filters:
-      - multiply: 1.84
-    id: battery_voltage
-    entity_category: diagnostic
-    unit_of_measurement: 'V'
-    device_class: voltage
+# sensor:
+#   - platform: adc
+#     pin: GPIO34
+#     name: "Battery Voltage ${devicename}"
+#     update_interval: 30s
+#     accuracy_decimals: 3
+#     attenuation: auto # auto is recommended, otherwise 11db
+#     filters:
+#       - multiply: 1.84
+#     id: battery_voltage
+#     entity_category: diagnostic
+#     unit_of_measurement: 'V'
+#     device_class: voltage
 
-  - platform: template
-    name: "Battery Percentage ${devicename}"
-    update_interval: 30s
-    accuracy_decimals: 2
-    lambda: |-
-        return ((id(battery_voltage).state - ${battery_empty}) / ${battery_diff} * 100.00);  
-    id: battery_percentage
-    entity_category: diagnostic
-    unit_of_measurement: '%'
-    device_class: battery
-  - platform: pulse_counter
-    pin: GPIO21
-    update_interval : 6s
-    name: "water pulse"
-    id: water_pulse
+#   - platform: template
+#     name: "Battery Percentage ${devicename}"
+#     update_interval: 30s
+#     accuracy_decimals: 2
+#     lambda: |-
+#         return ((id(battery_voltage).state - ${battery_empty}) / ${battery_diff} * 100.00);  
+#     id: battery_percentage
+#     entity_category: diagnostic
+#     unit_of_measurement: '%'
+#     device_class: battery
+#   - platform: pulse_counter
+#     pin: GPIO21
+#     update_interval : 6s
+#     name: "water pulse"
+#     id: water_pulse
 
 
 

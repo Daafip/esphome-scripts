@@ -81,7 +81,7 @@ output:
   id: fan_pwm_l   # LPWM — drives CCW rotation
   frequency: "20000Hz"
   channel: 0
-  max_power: 0.1955  # 200/1023 — DO NOT raise
+  max_power: 0.2955  # 200/1023 — DO NOT raise
   min_power: 0.000978 # 1/1023
 
 - platform: ledc
@@ -89,7 +89,7 @@ output:
   id: fan_pwm_r   # RPWM — drives CW rotation
   frequency: "20000Hz"
   channel: 1
-  max_power: 0.1955  # 200/1023 — DO NOT raise
+  max_power: 0.2955  # 200/1023 — DO NOT raise # default 0.1995
   min_power: 0.000978 # 1/1023
 
 # ----------------------------------------------------------------------------
@@ -105,7 +105,7 @@ number:
   step: 1
   unit_of_measurement: "%"
   optimistic: true
-  initial_value: 100
+  initial_value: 75
   on_value:
     then:
     - script.execute: apply_fan_state
