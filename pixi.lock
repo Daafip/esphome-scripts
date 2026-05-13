@@ -54,7 +54,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/6b/b0/e595ce2a2527e169c3bcd6c33d2473c1918e0b7f6826a043ca1245dd4e5b/crcmod-1.7.tar.gz
       - pypi: https://files.pythonhosted.org/packages/2d/cf/054b9d8220f81509939599c8bdbc0c408dbd2bdd41688616a20731371fe0/cryptography-46.0.7-cp311-abi3-manylinux_2_28_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/1a/59/da668ad9947db726747e29aa1978642919a5cfbe633a473f76446ea3915d/dbus_fast-3.1.2-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl
-      - pypi: https://files.pythonhosted.org/packages/22/de/6c7e5274ada12e270e33c33a0b16f6ee0ffc8637baced148c7e3810b50b6/esphome-2026.4.3-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/e0/1d/eab8222ba405cc6180d4e7329d14a62a286b5d914fdeaec44a2c4bf498e3/esphome-2026.4.5-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/35/ed/4c4506d35b831a357b2cd4be360a10dc54d22212e018076dbe47f1446589/esphome_dashboard-20260408.1-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/81/72/4185329677429c775fefb1e0a18b9a6c35240e083145ec5ea76cc8c3da3d/esphome_glyphsets-0.2.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/77/25/7b50d81a66f600a60f23258fa134201e97e854271b478ca4e21e9f694355/esptool-5.2.0.tar.gz
@@ -145,7 +145,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/d1/d6/3965ed04c63042e047cb6a3e6ed1a63a35087b6a609aa3a15ed8ac56c221/colorama-0.4.6-py2.py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/6b/b0/e595ce2a2527e169c3bcd6c33d2473c1918e0b7f6826a043ca1245dd4e5b/crcmod-1.7.tar.gz
       - pypi: https://files.pythonhosted.org/packages/2b/02/7788f9fefa1d060ca68717c3901ae7fffa21ee087a90b7f23c7a603c32ae/cryptography-46.0.7-cp311-abi3-win_amd64.whl
-      - pypi: https://files.pythonhosted.org/packages/22/de/6c7e5274ada12e270e33c33a0b16f6ee0ffc8637baced148c7e3810b50b6/esphome-2026.4.3-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/e0/1d/eab8222ba405cc6180d4e7329d14a62a286b5d914fdeaec44a2c4bf498e3/esphome-2026.4.5-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/35/ed/4c4506d35b831a357b2cd4be360a10dc54d22212e018076dbe47f1446589/esphome_dashboard-20260408.1-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/81/72/4185329677429c775fefb1e0a18b9a6c35240e083145ec5ea76cc8c3da3d/esphome_glyphsets-0.2.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/77/25/7b50d81a66f600a60f23258fa134201e97e854271b478ca4e21e9f694355/esptool-5.2.0.tar.gz
@@ -510,10 +510,10 @@ packages:
   version: 3.1.2
   sha256: 973afa96fcb97c680d50a66163ad2aa7327177e136a29fbeae280c660584536a
   requires_python: '>=3.10'
-- pypi: https://files.pythonhosted.org/packages/22/de/6c7e5274ada12e270e33c33a0b16f6ee0ffc8637baced148c7e3810b50b6/esphome-2026.4.3-py3-none-any.whl
+- pypi: https://files.pythonhosted.org/packages/e0/1d/eab8222ba405cc6180d4e7329d14a62a286b5d914fdeaec44a2c4bf498e3/esphome-2026.4.5-py3-none-any.whl
   name: esphome
-  version: 2026.4.3
-  sha256: 2a5304ce3cd8aea2e1278296051eb68e2190173d9b654d72c586c11889910dbd
+  version: 2026.4.5
+  sha256: 4e0e8b578e93b3471169e23e8ec42c64b405d18dd4dfd5ded07dd8a1adc71682
   requires_dist:
   - cryptography==46.0.7
   - voluptuous==0.16.0

@@ -55,7 +55,8 @@ web_server:
 # Add the external package here
 packages:
   remote_package_files:
-    url: https://github.com/m5st1ack/esphome-yaml
+    
+    url: https://github.com/m5stack/esphome-yaml
     files: [common/atom-echos3r-satellite-base.yaml]
     ref: main
     refresh: 0s
