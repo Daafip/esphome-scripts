@@ -7,3 +7,5 @@ hidden_*
 # pixi environments
 .pixi/*
 !.pixi/config.toml
+logs/
+__pycache__/
