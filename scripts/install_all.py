@@ -17,6 +17,7 @@ import datetime as dt
 import shutil
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 import yaml
@@ -98,17 +99,25 @@ def esphome_cmd() -> list[str]:
 # Install + logging                                                           #
 # --------------------------------------------------------------------------- #
 def upload_ota(yaml_path: Path, name: str, upload_log: Path) -> bool:
-    """Compile and upload over WiFi. Returns True on success."""
+    """Compile and upload over WiFi, retrying once after 10s. True on success."""
     cmd = esphome_cmd() + [
         "run", str(yaml_path),
         "--device", f"{name}.local",  # network address -> OTA over WiFi
         "--no-logs",
     ]
-    print(f"  > {' '.join(cmd)}")
     with upload_log.open("w") as f:
-        proc = subprocess.run(cmd, cwd=REPO, stdout=f,
-                              stderr=subprocess.STDOUT, text=True)
-    return proc.returncode == 0
+        for attempt in (1, 2):
+            print(f"  > attempt {attempt}: {' '.join(cmd)}")
+            f.write(f"\n===== upload attempt {attempt} =====\n")
+            f.flush()
+            proc = subprocess.run(cmd, cwd=REPO, stdout=f,
+                                  stderr=subprocess.STDOUT, text=True)
+            if proc.returncode == 0:
+                return True
+            if attempt == 1:
+                print("  ! upload failed, retrying in 10s...")
+                time.sleep(10)
+    return False
 
 
 def capture_logs(yaml_path: Path, name: str, log_file: Path) -> bool:
