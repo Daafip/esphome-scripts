@@ -6,7 +6,6 @@ substitutions:
   battery_empty: '2.492'
   battery_diff: '1' # '${battery_full}-${battery_empty}'
 
-
 esphome:
   name: ttgo
 
@@ -33,24 +32,15 @@ wifi:
     gateway: !secret gateway
     subnet: !secret subnet
   networks:
-  - ssid: !secret wifi_ssid_boven
-    password: !secret wifi_password_boven
-  - ssid: !secret wifi_ssid
-    password: !secret wifi_password
-
-
+    - ssid: !secret wifi_ssid_boven
+      password: !secret wifi_password_boven
+    - ssid: !secret wifi_ssid
+      password: !secret wifi_password
   ## Enable fallback hotspot (captive portal) in case wifi connection fails
   ap:
     ssid: "${devicename} Fallback Hotspot"
     password: !secret wifi_password
 
-# captive_portal:
-
-# web_server:
-#   port: 80
-#   auth:
-#     username: !secret web_server_username
-#     password: !secret web_server_password  
 esp32_ble_tracker:
   scan_parameters:
     interval: 1100ms
@@ -60,83 +50,211 @@ esp32_ble_tracker:
 bluetooth_proxy:
   active: true
 
-# switch:
-#   - platform: gpio
-#     name: "Desk lamp switch"
-#     id: ${devicename}_button_input_desk_lamp_switch
-#     pin:
-#       number: GPIO12
-#   - platform: gpio
-#     pin:
-#       number: GPIO13
-#     name: "Bed lamp switch"
-#     id: ${devicename}_button_input_bed_lamp_switch
+# ---------- Baby Buddy display ----------
+time:
+  - platform: homeassistant
+    id: ha_time
+    timezone: Europe/Amsterdam
 
-#### to HA - legacy but funny ya know
-# binary_sensor:
-#     ## general system status
-#   - platform: status
-#     name: "Node Status"
-#     id: system_status
-#     ## desk lamp
-#   - platform: gpio
-#     pin:
-#       number: GPIO0
-#       inverted: true
-#       mode:
-#         input: true
-#         pullup: true
-#     name: "Desk lamp switch toggle button"
-#     on_press:
-#       then:
-#         - switch.toggle: ${devicename}_button_input_desk_lamp_switch
-#     ## bed lamp: same but different ID
-#   - platform: gpio
-#     pin:
-#       number: GPIO35
-#       inverted: true
-#     name: "Bed lamp switch toggle button"
-#     on_press:
-#       then:
-#         - switch.toggle: ${devicename}_button_input_bed_lamp_switch
+http_request:
+  id: http_client
+  useragent: "esphome-ttgo"
+  timeout: 10s
 
-# sensor:
-#   - platform: adc
-#     pin: GPIO34
-#     name: "Battery Voltage ${devicename}"
-#     update_interval: 30s
-#     accuracy_decimals: 3
-#     attenuation: auto # auto is recommended, otherwise 11db
-#     filters:
-#       - multiply: 1.84
-#     id: battery_voltage
-#     entity_category: diagnostic
-#     unit_of_measurement: 'V'
-#     device_class: voltage
+globals:
+  - id: last_feed_ts
+    type: time_t
+    restore_value: no
+    initial_value: '0'
+  - id: last_feed_info
+    type: std::string
+    restore_value: no
+    initial_value: '""'
+  - id: last_change_ts
+    type: time_t
+    restore_value: no
+    initial_value: '0'
+  - id: last_change_info
+    type: std::string
+    restore_value: no
+    initial_value: '""'
+  - id: splash_type   # 0=none 1=wet 2=solid 3=both 4=feeding
+    type: int
+    restore_value: no
+    initial_value: '0'
+  - id: splash_frame
+    type: int
+    restore_value: no
+    initial_value: '0'
 
-#   - platform: template
-#     name: "Battery Percentage ${devicename}"
-#     update_interval: 30s
-#     accuracy_decimals: 2
-#     lambda: |-
-#         return ((id(battery_voltage).state - ${battery_empty}) / ${battery_diff} * 100.00);  
-#     id: battery_percentage
-#     entity_category: diagnostic
-#     unit_of_measurement: '%'
-#     device_class: battery
-#   - platform: pulse_counter
-#     pin: GPIO21
-#     update_interval : 6s
-#     name: "water pulse"
-#     id: water_pulse
+script:
+  - id: splash_anim
+    mode: restart
+    then:
+      - lambda: 'id(splash_frame) = 0;'
+      - repeat:
+          count: 25          # 25 x 80ms = ~2s
+          then:
+            - lambda: |-
+                id(splash_frame) += 1;
+                id(ttgo_display).update();
+            - delay: 80ms
+      - lambda: |-
+          id(splash_type) = 0;
+          id(ttgo_display).update();
 
+interval:
+  - interval: 1min
+    startup_delay: 15s
+    then:
+      - http_request.get:
+          url: "http://192.168.68.101:8889/api/feedings/?limit=1"
+          request_headers:
+            Authorization: !secret babybuddy_token
+          capture_response: true
+          on_response:
+            then:
+              - lambda: |-
+                  if (response->status_code != 200) return;
+                  bool trigger = false;
+                  json::parse_json(body, [&trigger](JsonObject root) -> bool {
+                    JsonArray results = root["results"];
+                    if (results.size() == 0) return true;
+                    JsonObject item = results[0];
+                    // parse ISO time, e.g. 2026-07-08T14:30:00+02:00
+                    std::string start = item["start"].as<std::string>();
+                    struct tm tm{};
+                    time_t prev = id(last_feed_ts);
+                    if (strptime(start.c_str(), "%Y-%m-%dT%H:%M:%S", &tm) != nullptr) {
+                      tm.tm_isdst = -1;
+                      id(last_feed_ts) = mktime(&tm);
+                    }
+                    if (prev != 0 && id(last_feed_ts) > prev) {
+                      id(splash_type) = 4;
+                      trigger = true;
+                    }
+                    char buf[48];
+                    if (!item["amount"].isNull()) {
+                      snprintf(buf, sizeof(buf), "%s, %.0f",
+                               item["type"].as<const char*>(),
+                               item["amount"].as<float>());
+                    } else {
+                      snprintf(buf, sizeof(buf), "%s (%s)",
+                               item["type"].as<const char*>(),
+                               item["method"].as<const char*>());
+                    }
+                    id(last_feed_info) = buf;
+                    return true;
+                  });
+                  if (trigger) id(splash_anim).execute();
+      - http_request.get:
+          url: "http://192.168.68.101:8889/api/changes/?limit=1"
+          request_headers:
+            Authorization: !secret babybuddy_token
+          capture_response: true
+          on_response:
+            then:
+              - lambda: |-
+                  if (response->status_code != 200) return;
+                  bool trigger = false;
+                  json::parse_json(body, [&trigger](JsonObject root) -> bool {
+                    JsonArray results = root["results"];
+                    if (results.size() == 0) return true;
+                    JsonObject item = results[0];
+                    std::string t = item["time"].as<std::string>();
+                    struct tm tm{};
+                    time_t prev = id(last_change_ts);
+                    if (strptime(t.c_str(), "%Y-%m-%dT%H:%M:%S", &tm) != nullptr) {
+                      tm.tm_isdst = -1;
+                      id(last_change_ts) = mktime(&tm);
+                    }
+                    bool wet = item["wet"].as<bool>();
+                    bool solid = item["solid"].as<bool>();
+                    if (prev != 0 && id(last_change_ts) > prev) {
+                      id(splash_type) = (wet && solid) ? 3 : (solid ? 2 : 1);
+                      trigger = true;
+                    }
+                    std::string info;
+                    if (wet) info += "wet";
+                    if (solid) { if (!info.empty()) info += " + "; info += "solid"; }
+                    id(last_change_info) = info;
+                    return true;
+                  });
+                  if (trigger) id(splash_anim).execute();
 
+font:
+  - file: "gfonts://Roboto@700"
+    id: font_big
+    size: 26
+  - file: "gfonts://Roboto"
+    id: font_small
+    size: 16
+  - file: "gfonts://Noto Emoji"
+    id: font_emoji
+    size: 70
+    glyphs: ["💧", "💩", "🍼"]
 
-### MQTT
+color:
+  - id: c_feed
+    hex: 4FC3F7
+  - id: c_change
+    hex: FFB74D
 
+spi:
+  clk_pin: GPIO18
+  mosi_pin: GPIO19
 
-# mqtt:
-#   broker: !secret mqtt_ip
-#   port: 1883
-#   username: !secret mqtt_username
-#   password: !secret mqtt_password
+display:
+  - platform: st7789v
+    id: ttgo_display
+    model: TTGO TDisplay 135x240
+    backlight_pin: GPIO4
+    cs_pin: GPIO5
+    dc_pin: GPIO16
+    reset_pin: GPIO23
+    rotation: 90
+    update_interval: 30s
+    lambda: |-
+      auto now = id(ha_time).now();
+
+      // ---- splash animation ----
+      if (id(splash_type) != 0) {
+        int cx = it.get_width() / 2;
+        int y = 34 + (int)(12 * sin(id(splash_frame) * 0.6f));  // bounce
+        if (id(splash_type) == 3) {
+          it.print(cx - 48, y, id(font_emoji), TextAlign::TOP_CENTER, "💧");
+          it.print(cx + 48, y, id(font_emoji), TextAlign::TOP_CENTER, "💩");
+        } else {
+          const char *e = id(splash_type) == 1 ? "💧"
+                        : id(splash_type) == 2 ? "💩" : "🍼";
+          it.print(cx, y, id(font_emoji), TextAlign::TOP_CENTER, e);
+        }
+        it.print(cx, 6, id(font_small), TextAlign::TOP_CENTER,
+                 id(splash_type) == 4 ? "New feeding!" : "New diaper!");
+        return;
+      }
+
+      // ---- normal layout ----
+      auto ago = [&](time_t ts, char *buf, size_t len) {
+        long mins = (now.timestamp - ts) / 60;
+        if (mins < 0) mins = 0;
+        if (mins < 60) snprintf(buf, len, "%ld min ago", mins);
+        else snprintf(buf, len, "%ldh %ldm ago", mins / 60, mins % 60);
+      };
+      char buf[32];
+      it.print(6, 2, id(font_small), id(c_feed), "Feeding");
+      if (id(last_feed_ts) > 0 && now.is_valid()) {
+        ago(id(last_feed_ts), buf, sizeof(buf));
+        it.print(6, 18, id(font_big), id(c_feed), buf);
+        it.print(6, 46, id(font_small), id(last_feed_info).c_str());
+      } else {
+        it.print(6, 18, id(font_big), "no data");
+      }
+      it.print(6, 66, id(font_small), id(c_change), "Diaper");
+      if (id(last_change_ts) > 0 && now.is_valid()) {
+        ago(id(last_change_ts), buf, sizeof(buf));
+        it.print(6, 82, id(font_big), id(c_change), buf);
+        it.print(6, 110, id(font_small), id(last_change_info).c_str());
+      } else {
+        it.print(6, 82, id(font_big), "no data");
+      }

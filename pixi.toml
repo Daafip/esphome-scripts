@@ -13,4 +13,4 @@ python="3.13.*"
 
 # https://github.com/esphome/esphome
 [pypi-dependencies]
-esphome="==2026.6.0"
+esphome="==2026.6.4"

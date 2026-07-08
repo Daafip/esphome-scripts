@@ -56,7 +56,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/6b/b0/e595ce2a2527e169c3bcd6c33d2473c1918e0b7f6826a043ca1245dd4e5b/crcmod-1.7.tar.gz
       - pypi: https://files.pythonhosted.org/packages/d2/bb/cc4b78784f97efc8c5874c2a9743708d172be6663024b34a0467885ae0c8/cryptography-48.0.1-cp311-abi3-manylinux_2_28_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/1a/59/da668ad9947db726747e29aa1978642919a5cfbe633a473f76446ea3915d/dbus_fast-3.1.2-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl
-      - pypi: https://files.pythonhosted.org/packages/1e/b6/791fd4a3734249c827902990f4e2ad1fb6b194e86a25c67bd0ee45b8df7a/esphome-2026.6.0-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/e7/f1/d226dab265939595c85dfc2a2c1a6b9108cf326c364009b5377a2179aed2/esphome-2026.6.4-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/3e/b5/40c5329159a02e29653b88dc5119f4106d738ac880d74b2ce8ed8169c733/esphome_dashboard-20260425.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/81/72/4185329677429c775fefb1e0a18b9a6c35240e083145ec5ea76cc8c3da3d/esphome_glyphsets-0.2.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/82/ca/aa2a6aafe214b3338eb56c5dc941e7e83a0f9e8b9bd05ac91b5d1a6ee9c9/esptool-5.3.0.tar.gz
@@ -116,7 +116,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/6d/0d/8adfeaa62945f90d19ddc461c55f4a50c258af7662d34b6a3d5d1f8646f6/uvicorn-0.34.3-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/d1/00/0e0da784245c93cf346150ab67634177bf277f93b7a162bb56c928c39c04/voluptuous-0.16.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/a4/f5/10b68b7b1544245097b2a1b8238f66f2fc6dcaeb24ba5d917f52bd2eed4f/wsproto-1.3.2-py3-none-any.whl
-      - pypi: https://files.pythonhosted.org/packages/7c/9e/8a7eef9c9c4af9f5a90e95703db1adbfc932453d01679f719f84323bcf0a/zeroconf-0.149.16-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl
+      - pypi: https://files.pythonhosted.org/packages/43/2d/60a04c3cf7e243e47d60152394a5e29a4839ea8fd1c260868ff7af08240d/zeroconf-0.150.0-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl
       win-64:
       - conda: https://conda.anaconda.org/conda-forge/win-64/bzip2-1.0.8-h0ad9c76_8.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/ca-certificates-2025.11.12-h4c7d964_0.conda
@@ -157,7 +157,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/d1/d6/3965ed04c63042e047cb6a3e6ed1a63a35087b6a609aa3a15ed8ac56c221/colorama-0.4.6-py2.py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/6b/b0/e595ce2a2527e169c3bcd6c33d2473c1918e0b7f6826a043ca1245dd4e5b/crcmod-1.7.tar.gz
       - pypi: https://files.pythonhosted.org/packages/c5/69/0572c77dbace6fef72f33755bd52ea399c71367250d366237f8691826b9e/cryptography-48.0.1-cp311-abi3-win_amd64.whl
-      - pypi: https://files.pythonhosted.org/packages/1e/b6/791fd4a3734249c827902990f4e2ad1fb6b194e86a25c67bd0ee45b8df7a/esphome-2026.6.0-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/e7/f1/d226dab265939595c85dfc2a2c1a6b9108cf326c364009b5377a2179aed2/esphome-2026.6.4-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/3e/b5/40c5329159a02e29653b88dc5119f4106d738ac880d74b2ce8ed8169c733/esphome_dashboard-20260425.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/81/72/4185329677429c775fefb1e0a18b9a6c35240e083145ec5ea76cc8c3da3d/esphome_glyphsets-0.2.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/82/ca/aa2a6aafe214b3338eb56c5dc941e7e83a0f9e8b9bd05ac91b5d1a6ee9c9/esptool-5.3.0.tar.gz
@@ -226,7 +226,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/94/93/4f75fd6a4c96f1e9bee198c5dc9a9b57e87a9c38117e1b5e423401886353/winrt_windows_foundation_collections-3.2.1-cp313-cp313-win_amd64.whl
       - pypi: https://files.pythonhosted.org/packages/15/59/601724453b885265c7779d5f8025b043a68447cbc64ceb9149d674d5b724/winrt_windows_storage_streams-3.2.1-cp313-cp313-win_amd64.whl
       - pypi: https://files.pythonhosted.org/packages/a4/f5/10b68b7b1544245097b2a1b8238f66f2fc6dcaeb24ba5d917f52bd2eed4f/wsproto-1.3.2-py3-none-any.whl
-      - pypi: https://files.pythonhosted.org/packages/11/77/c15f97a2e3e373bd6e1431238028700f5537667e502d7fa0b218619ac6ad/zeroconf-0.149.16-cp313-cp313-win_amd64.whl
+      - pypi: https://files.pythonhosted.org/packages/d8/43/46bcbf3260c4726242042b69ebab13878bf14c167530bde56b6df267b55b/zeroconf-0.150.0-cp313-cp313-win_amd64.whl
 packages:
 - conda: https://conda.anaconda.org/conda-forge/linux-64/_libgcc_mutex-0.1-conda_forge.tar.bz2
   sha256: fe51de6107f9edc7aa4f786a70f4a883943bc9d39b3bb7307c04c41410990726
@@ -508,10 +508,10 @@ packages:
   version: 3.1.2
   sha256: 973afa96fcb97c680d50a66163ad2aa7327177e136a29fbeae280c660584536a
   requires_python: '>=3.10'
-- pypi: https://files.pythonhosted.org/packages/1e/b6/791fd4a3734249c827902990f4e2ad1fb6b194e86a25c67bd0ee45b8df7a/esphome-2026.6.0-py3-none-any.whl
+- pypi: https://files.pythonhosted.org/packages/e7/f1/d226dab265939595c85dfc2a2c1a6b9108cf326c364009b5377a2179aed2/esphome-2026.6.4-py3-none-any.whl
   name: esphome
-  version: 2026.6.0
-  sha256: 0edeedbecdbb8f69e75be015d7444908e71b8f6537a7806ef817793d7ea0e1e8
+  version: 2026.6.4
+  sha256: c827abc1a3f57652c8832c94ce96a3b41fa72b8ede676c2d31314b7c5c7919c3
   requires_dist:
   - cryptography==48.0.1
   - voluptuous==0.16.0
@@ -528,7 +528,7 @@ packages:
   - click==8.3.3
   - esphome-dashboard==20260425.0
   - aioesphomeapi==45.3.1
-  - zeroconf==0.149.16
+  - zeroconf==0.150.0
   - puremagic==1.30
   - ruamel-yaml==0.19.1
   - ruamel-yaml-clib==0.2.15
@@ -1941,17 +1941,17 @@ packages:
   requires_dist:
   - h11>=0.16.0,<1
   requires_python: '>=3.10'
-- pypi: https://files.pythonhosted.org/packages/11/77/c15f97a2e3e373bd6e1431238028700f5537667e502d7fa0b218619ac6ad/zeroconf-0.149.16-cp313-cp313-win_amd64.whl
+- pypi: https://files.pythonhosted.org/packages/43/2d/60a04c3cf7e243e47d60152394a5e29a4839ea8fd1c260868ff7af08240d/zeroconf-0.150.0-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl
   name: zeroconf
-  version: 0.149.16
-  sha256: 8f669e6aed52feaf73316a6205eff09696bfddce3e4f39fbc2c6e28500366dda
+  version: 0.150.0
+  sha256: 489a51320d20e7f07b2f447cd515f3645d17ceced0212f7249a83ce6d3b748e0
   requires_dist:
   - ifaddr>=0.1.7
   requires_python: '>=3.10'
-- pypi: https://files.pythonhosted.org/packages/7c/9e/8a7eef9c9c4af9f5a90e95703db1adbfc932453d01679f719f84323bcf0a/zeroconf-0.149.16-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl
+- pypi: https://files.pythonhosted.org/packages/d8/43/46bcbf3260c4726242042b69ebab13878bf14c167530bde56b6df267b55b/zeroconf-0.150.0-cp313-cp313-win_amd64.whl
   name: zeroconf
-  version: 0.149.16
-  sha256: b6cb2873ae74265e28756f83454d1fde53eaaed9bc380bb43ccb2ac42b4b5a5a
+  version: 0.150.0
+  sha256: 122c6bec1f462c0feaa7f8fe4a4bc605f5c0d8f8e82e2ebd5aeae48a24da4564
   requires_dist:
   - ifaddr>=0.1.7
   requires_python: '>=3.10'
