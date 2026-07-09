@@ -11,8 +11,9 @@ esphome:
     priority: 800
     then:
       - lambda: |-
-          // ESPHome >=2026.6 no longer sets the libc TZ env var, so mktime()
-          // in the babybuddy lambdas would interpret timestamps as UTC.
+          // ESPHome >=2026.6 no longer sets the libc TZ env var. The babybuddy
+          // lambdas parse timestamps TZ-independently now, but keep libc in the
+          // right zone as a fallback for anything else that might convert time.
           // Same POSIX rule as timezone: Europe/Amsterdam below.
           setenv("TZ", "CET-1CEST,M3.5.0,M10.5.0/3", 1);
           tzset();
@@ -142,18 +143,10 @@ globals:
     type: time_t
     restore_value: yes
     initial_value: '0'
-  - id: last_feed_info
-    type: std::string
-    restore_value: no
-    initial_value: '""'
   - id: last_change_ts
     type: time_t
     restore_value: yes
     initial_value: '0'
-  - id: last_change_info
-    type: std::string
-    restore_value: no
-    initial_value: '""'
   - id: splash_type   # 0=none 1=wet 2=solid 3=both 4=feeding
     type: int
     restore_value: no
@@ -231,28 +224,39 @@ script:
                     JsonArray results = root["results"];
                     if (results.size() == 0) return true;    // keep last known data
                     JsonObject item = results[0];
+                    // Epoch from wall time + the offset BabyBuddy sends (+02:00);
+                    // deliberately avoids mktime()/libc TZ state, which proved
+                    // unreliable when parsing from the HA service path.
                     std::string start = item["start"].as<std::string>();
                     struct tm tm{};
                     time_t prev = id(last_feed_ts);
-                    if (strptime(start.c_str(), "%Y-%m-%dT%H:%M:%S", &tm) != nullptr) {
-                      tm.tm_isdst = -1;
-                      id(last_feed_ts) = mktime(&tm);
+                    const char *rest = strptime(start.c_str(), "%Y-%m-%dT%H:%M:%S", &tm);
+                    if (rest != nullptr) {
+                      if (*rest == '.') { rest++; while (*rest >= '0' && *rest <= '9') rest++; }
+                      long off = 0;
+                      if (*rest == '+' || *rest == '-') {
+                        int oh = 0, om = 0;
+                        sscanf(rest + 1, "%2d:%2d", &oh, &om);
+                        off = ((long) oh * 60 + om) * 60;
+                        if (*rest == '-') off = -off;
+                      }
+                      ESPTime et{};
+                      et.year = tm.tm_year + 1900;
+                      et.month = tm.tm_mon + 1;
+                      et.day_of_month = tm.tm_mday;
+                      et.hour = tm.tm_hour;
+                      et.minute = tm.tm_min;
+                      et.second = tm.tm_sec;
+                      et.recalc_timestamp_utc(false);
+                      id(last_feed_ts) = et.timestamp - off;
+                      ESP_LOGD("babybuddy", "feed %s -> ts=%ld now=%ld",
+                               start.c_str(), (long) id(last_feed_ts),
+                               (long) id(ha_time).now().timestamp);
                     }
                     if (prev != 0 && id(last_feed_ts) > prev) {
                       id(splash_type) = 4;
                       trigger = true;
                     }
-                    char buf[48];
-                    if (!item["amount"].isNull()) {
-                      snprintf(buf, sizeof(buf), "%s, %.0f",
-                               item["type"].as<const char*>(),
-                               item["amount"].as<float>());
-                    } else {
-                      snprintf(buf, sizeof(buf), "%s (%s)",
-                               item["type"].as<const char*>(),
-                               item["method"].as<const char*>());
-                    }
-                    id(last_feed_info) = buf;
                     return true;
                   });
                   if (trigger && !id(splash_anim).is_running()) {
@@ -273,12 +277,32 @@ script:
                     JsonArray results = root["results"];
                     if (results.size() == 0) return true;    // keep last known data
                     JsonObject item = results[0];
+                    // see feeding lambda: epoch from wall time + explicit offset
                     std::string t = item["time"].as<std::string>();
                     struct tm tm{};
                     time_t prev = id(last_change_ts);
-                    if (strptime(t.c_str(), "%Y-%m-%dT%H:%M:%S", &tm) != nullptr) {
-                      tm.tm_isdst = -1;
-                      id(last_change_ts) = mktime(&tm);
+                    const char *rest = strptime(t.c_str(), "%Y-%m-%dT%H:%M:%S", &tm);
+                    if (rest != nullptr) {
+                      if (*rest == '.') { rest++; while (*rest >= '0' && *rest <= '9') rest++; }
+                      long off = 0;
+                      if (*rest == '+' || *rest == '-') {
+                        int oh = 0, om = 0;
+                        sscanf(rest + 1, "%2d:%2d", &oh, &om);
+                        off = ((long) oh * 60 + om) * 60;
+                        if (*rest == '-') off = -off;
+                      }
+                      ESPTime et{};
+                      et.year = tm.tm_year + 1900;
+                      et.month = tm.tm_mon + 1;
+                      et.day_of_month = tm.tm_mday;
+                      et.hour = tm.tm_hour;
+                      et.minute = tm.tm_min;
+                      et.second = tm.tm_sec;
+                      et.recalc_timestamp_utc(false);
+                      id(last_change_ts) = et.timestamp - off;
+                      ESP_LOGD("babybuddy", "change %s -> ts=%ld now=%ld",
+                               t.c_str(), (long) id(last_change_ts),
+                               (long) id(ha_time).now().timestamp);
                     }
                     bool wet = item["wet"].as<bool>();
                     bool solid = item["solid"].as<bool>();
@@ -286,10 +310,6 @@ script:
                       id(splash_type) = (wet && solid) ? 3 : (solid ? 2 : 1);
                       trigger = true;
                     }
-                    std::string info;
-                    if (wet) info += "wet";
-                    if (solid) { if (!info.empty()) info += " + "; info += "solid"; }
-                    id(last_change_info) = info;
                     return true;
                   });
                   if (trigger && !id(splash_anim).is_running()) {
@@ -319,10 +339,10 @@ interval:
 font:
   - file: "gfonts://Roboto@700"
     id: font_big
-    size: 26
+    size: 40
   - file: "gfonts://Roboto"
     id: font_small
-    size: 16
+    size: 18
   - file: "gfonts://Noto Emoji"
     id: font_emoji
     size: 70
@@ -378,27 +398,25 @@ display:
         else snprintf(buf, len, "%ldh %ldm ago", mins / 60, mins % 60);
       };
       char buf[32];
-      it.print(6, 2, id(font_small), id(c_feed), "Feeding");
+      it.print(6, 0, id(font_small), id(c_feed), "Feeding");
       if (id(last_feed_ts) > 0) {
         if (now.is_valid()) {
           ago(id(last_feed_ts), buf, sizeof(buf));
-          it.print(6, 18, id(font_big), id(c_feed), buf);
+          it.print(6, 20, id(font_big), id(c_feed), buf);
         } else {
-          it.print(6, 18, id(font_big), id(c_feed), "syncing...");
+          it.print(6, 20, id(font_big), id(c_feed), "syncing...");
         }
-        it.print(6, 46, id(font_small), id(last_feed_info).c_str());
       } else {
-        it.print(6, 18, id(font_big), "no data yet");
+        it.print(6, 20, id(font_big), "no data yet");
       }
-      it.print(6, 66, id(font_small), id(c_change), "Diaper");
+      it.print(6, 70, id(font_small), id(c_change), "Diaper");
       if (id(last_change_ts) > 0) {
         if (now.is_valid()) {
           ago(id(last_change_ts), buf, sizeof(buf));
-          it.print(6, 82, id(font_big), id(c_change), buf);
+          it.print(6, 90, id(font_big), id(c_change), buf);
         } else {
-          it.print(6, 82, id(font_big), id(c_change), "syncing...");
+          it.print(6, 90, id(font_big), id(c_change), "syncing...");
         }
-        it.print(6, 110, id(font_small), id(last_change_info).c_str());
       } else {
-        it.print(6, 82, id(font_big), "no data yet");
+        it.print(6, 90, id(font_big), "no data yet");
       }
