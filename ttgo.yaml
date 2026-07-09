@@ -1,10 +1,9 @@
 substitutions:
-  # Modify variables based on your settings
   hostname: "ttgo"
   devicename: ttgo
   battery_full: '3.764128'
   battery_empty: '2.492'
-  battery_diff: '1' # '${battery_full}-${battery_empty}'
+  battery_diff: '1'
 
 esphome:
   name: ttgo
@@ -14,13 +13,28 @@ esp32:
   framework:
     type: arduino
 
-## Enable logging
 logger:
 
-## Enable Home Assistant API
 api:
   encryption:
     key: !secret ttgo_ota_key
+  services:
+    - service: babybuddy_event
+      variables:
+        feeding: bool
+        wet: bool
+        solid: bool
+      then:
+        - lambda: |-
+            if (feeding)           id(splash_type) = 4;
+            else if (wet && solid) id(splash_type) = 3;
+            else if (solid)        id(splash_type) = 2;
+            else                   id(splash_type) = 1;
+        - script.execute:
+            id: screen_wake
+            duration_s: 60
+        - script.execute: splash_anim
+        - script.execute: fetch_babybuddy
 
 ota:
   platform: esphome
@@ -36,7 +50,6 @@ wifi:
       password: !secret wifi_password_boven
     - ssid: !secret wifi_ssid
       password: !secret wifi_password
-  ## Enable fallback hotspot (captive portal) in case wifi connection fails
   ap:
     ssid: "${devicename} Fallback Hotspot"
     password: !secret wifi_password
@@ -61,10 +74,64 @@ http_request:
   useragent: "esphome-ttgo"
   timeout: 10s
 
+switch:
+  # Backlight - GPIO4 is ONLY used here, not in the display block
+  - platform: gpio
+    pin: GPIO4
+    id: backlight
+    name: "${devicename} backlight"
+    restore_mode: ALWAYS_OFF
+
+  # HA entity: enable/disable the auto-off logic
+  - platform: template
+    id: backlight_timeout
+    name: "${devicename} backlight timeout"
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_ON
+    entity_category: config
+    on_turn_off:
+      then:
+        # timeouts disabled -> cancel any running timer, keep screen on
+        - script.stop: screen_wake
+        - switch.turn_on: backlight
+    on_turn_on:
+      then:
+        # timeouts re-enabled -> if screen is on, give it one last minute
+        - if:
+            condition:
+              switch.is_on: backlight
+            then:
+              - script.execute:
+                  id: screen_wake
+                  duration_s: 60
+
+# On-board buttons: toggle the screen
+binary_sensor:
+  - platform: gpio
+    pin:
+      number: GPIO0
+      inverted: true
+      ignore_strapping_warning: true
+      mode:
+        input: true
+        pullup: true
+    id: btn_top
+    on_press:
+      then:
+        - script.execute: screen_toggle
+  - platform: gpio
+    pin:
+      number: GPIO35   # input-only pin, external pullup on board
+      inverted: true
+    id: btn_bottom
+    on_press:
+      then:
+        - script.execute: screen_toggle
+
 globals:
   - id: last_feed_ts
     type: time_t
-    restore_value: no
+    restore_value: yes
     initial_value: '0'
   - id: last_feed_info
     type: std::string
@@ -72,7 +139,7 @@ globals:
     initial_value: '""'
   - id: last_change_ts
     type: time_t
-    restore_value: no
+    restore_value: yes
     initial_value: '0'
   - id: last_change_info
     type: std::string
@@ -88,12 +155,47 @@ globals:
     initial_value: '0'
 
 script:
+  # Turn screen on; auto-off after duration_s only if timeout is enabled.
+  - id: screen_wake
+    mode: restart
+    parameters:
+      duration_s: int
+    then:
+      - lambda: 'id(ttgo_display).update();'   # fresh content before lighting up
+      - switch.turn_on: backlight
+      - if:
+          condition:
+            switch.is_on: backlight_timeout
+          then:
+            - delay: !lambda 'return duration_s * 1000;'
+            - if:
+                condition:
+                  switch.is_on: backlight_timeout   # may have been disabled mid-delay
+                then:
+                  - switch.turn_off: backlight
+
+  # Button behavior:
+  #  timeout on : off -> on for 1 min, on -> off immediately
+  #  timeout off: plain toggle
+  - id: screen_toggle
+    then:
+      - if:
+          condition:
+            switch.is_on: backlight
+          then:
+            - script.stop: screen_wake
+            - switch.turn_off: backlight
+          else:
+            - script.execute:
+                id: screen_wake
+                duration_s: 60
+
   - id: splash_anim
     mode: restart
     then:
       - lambda: 'id(splash_frame) = 0;'
       - repeat:
-          count: 25          # 25 x 80ms = ~2s
+          count: 25          # ~2s
           then:
             - lambda: |-
                 id(splash_frame) += 1;
@@ -103,9 +205,8 @@ script:
           id(splash_type) = 0;
           id(ttgo_display).update();
 
-interval:
-  - interval: 1min
-    startup_delay: 15s
+  - id: fetch_babybuddy
+    mode: restart
     then:
       - http_request.get:
           url: "http://192.168.68.101:8889/api/feedings/?limit=1"
@@ -115,13 +216,12 @@ interval:
           on_response:
             then:
               - lambda: |-
-                  if (response->status_code != 200) return;
+                  if (response->status_code != 200) return;  // keep last known data
                   bool trigger = false;
                   json::parse_json(body, [&trigger](JsonObject root) -> bool {
                     JsonArray results = root["results"];
-                    if (results.size() == 0) return true;
+                    if (results.size() == 0) return true;    // keep last known data
                     JsonObject item = results[0];
-                    // parse ISO time, e.g. 2026-07-08T14:30:00+02:00
                     std::string start = item["start"].as<std::string>();
                     struct tm tm{};
                     time_t prev = id(last_feed_ts);
@@ -146,7 +246,10 @@ interval:
                     id(last_feed_info) = buf;
                     return true;
                   });
-                  if (trigger) id(splash_anim).execute();
+                  if (trigger && !id(splash_anim).is_running()) {
+                    id(screen_wake).execute(60);
+                    id(splash_anim).execute();
+                  }
       - http_request.get:
           url: "http://192.168.68.101:8889/api/changes/?limit=1"
           request_headers:
@@ -155,11 +258,11 @@ interval:
           on_response:
             then:
               - lambda: |-
-                  if (response->status_code != 200) return;
+                  if (response->status_code != 200) return;  // keep last known data
                   bool trigger = false;
                   json::parse_json(body, [&trigger](JsonObject root) -> bool {
                     JsonArray results = root["results"];
-                    if (results.size() == 0) return true;
+                    if (results.size() == 0) return true;    // keep last known data
                     JsonObject item = results[0];
                     std::string t = item["time"].as<std::string>();
                     struct tm tm{};
@@ -180,7 +283,29 @@ interval:
                     id(last_change_info) = info;
                     return true;
                   });
-                  if (trigger) id(splash_anim).execute();
+                  if (trigger && !id(splash_anim).is_running()) {
+                    id(screen_wake).execute(60);
+                    id(splash_anim).execute();
+                  }
+
+interval:
+  - interval: 1min             # backup poll; HA push handles the instant case
+    startup_delay: 15s
+    then:
+      - script.execute: fetch_babybuddy
+  # Periodic peek: screen on for 30s every 10min (only in timeout mode)
+  - interval: 10min
+    startup_delay: 30s
+    then:
+      - if:
+          condition:
+            and:
+              - switch.is_on: backlight_timeout
+              - switch.is_off: backlight   # don't cut a running 1-min wake short
+          then:
+            - script.execute:
+                id: screen_wake
+                duration_s: 30
 
 font:
   - file: "gfonts://Roboto@700"
@@ -208,8 +333,10 @@ display:
   - platform: st7789v
     id: ttgo_display
     model: TTGO TDisplay 135x240
-    backlight_pin: GPIO4
-    cs_pin: GPIO5
+    backlight_pin: no
+    cs_pin:
+      number: GPIO5
+      ignore_strapping_warning: true
     dc_pin: GPIO16
     reset_pin: GPIO23
     rotation: 90
@@ -220,7 +347,7 @@ display:
       // ---- splash animation ----
       if (id(splash_type) != 0) {
         int cx = it.get_width() / 2;
-        int y = 34 + (int)(12 * sin(id(splash_frame) * 0.6f));  // bounce
+        int y = 34 + (int)(12 * sin(id(splash_frame) * 0.6f));
         if (id(splash_type) == 3) {
           it.print(cx - 48, y, id(font_emoji), TextAlign::TOP_CENTER, "💧");
           it.print(cx + 48, y, id(font_emoji), TextAlign::TOP_CENTER, "💩");
@@ -243,18 +370,26 @@ display:
       };
       char buf[32];
       it.print(6, 2, id(font_small), id(c_feed), "Feeding");
-      if (id(last_feed_ts) > 0 && now.is_valid()) {
-        ago(id(last_feed_ts), buf, sizeof(buf));
-        it.print(6, 18, id(font_big), id(c_feed), buf);
+      if (id(last_feed_ts) > 0) {
+        if (now.is_valid()) {
+          ago(id(last_feed_ts), buf, sizeof(buf));
+          it.print(6, 18, id(font_big), id(c_feed), buf);
+        } else {
+          it.print(6, 18, id(font_big), id(c_feed), "syncing...");
+        }
         it.print(6, 46, id(font_small), id(last_feed_info).c_str());
       } else {
-        it.print(6, 18, id(font_big), "no data");
+        it.print(6, 18, id(font_big), "no data yet");
       }
       it.print(6, 66, id(font_small), id(c_change), "Diaper");
-      if (id(last_change_ts) > 0 && now.is_valid()) {
-        ago(id(last_change_ts), buf, sizeof(buf));
-        it.print(6, 82, id(font_big), id(c_change), buf);
+      if (id(last_change_ts) > 0) {
+        if (now.is_valid()) {
+          ago(id(last_change_ts), buf, sizeof(buf));
+          it.print(6, 82, id(font_big), id(c_change), buf);
+        } else {
+          it.print(6, 82, id(font_big), id(c_change), "syncing...");
+        }
         it.print(6, 110, id(font_small), id(last_change_info).c_str());
       } else {
-        it.print(6, 82, id(font_big), "no data");
+        it.print(6, 82, id(font_big), "no data yet");
       }
