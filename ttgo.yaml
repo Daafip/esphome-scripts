@@ -7,6 +7,15 @@ substitutions:
 
 esphome:
   name: ttgo
+  on_boot:
+    priority: 800
+    then:
+      - lambda: |-
+          // ESPHome >=2026.6 no longer sets the libc TZ env var, so mktime()
+          // in the babybuddy lambdas would interpret timestamps as UTC.
+          // Same POSIX rule as timezone: Europe/Amsterdam below.
+          setenv("TZ", "CET-1CEST,M3.5.0,M10.5.0/3", 1);
+          tzset();
 
 esp32:
   board: ttgo-t7-v14-mini32
@@ -247,7 +256,7 @@ script:
                     return true;
                   });
                   if (trigger && !id(splash_anim).is_running()) {
-                    id(screen_wake).execute(60);
+                    id(screen_wake).execute(45);
                     id(splash_anim).execute();
                   }
       - http_request.get:
@@ -284,7 +293,7 @@ script:
                     return true;
                   });
                   if (trigger && !id(splash_anim).is_running()) {
-                    id(screen_wake).execute(60);
+                    id(screen_wake).execute(45);
                     id(splash_anim).execute();
                   }
 
