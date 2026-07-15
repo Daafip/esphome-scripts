@@ -155,20 +155,26 @@ globals:
     type: int
     restore_value: no
     initial_value: '0'
+  - id: timer_start   # wall-clock start "HH:MM" of running timer, "" = none
+    type: std::string
+    restore_value: no
+    initial_value: '""'
 
 script:
-  # Turn screen on; auto-off after duration_s only if timeout is enabled.
+  # Auto-wake for events/peeks: screen on for duration_s, then off again.
+  # Only acts in timeout mode; with timeouts disabled the backlight is fully
+  # manual and scripts never touch it.
   - id: screen_wake
     mode: restart
     parameters:
       duration_s: int
     then:
-      - lambda: 'id(ttgo_display).update();'   # fresh content before lighting up
-      - switch.turn_on: backlight
       - if:
           condition:
             switch.is_on: backlight_timeout
           then:
+            - lambda: 'id(ttgo_display).update();'   # fresh content before lighting up
+            - switch.turn_on: backlight
             - delay: !lambda 'return duration_s * 1000;'
             - if:
                 condition:
@@ -188,9 +194,17 @@ script:
             - script.stop: screen_wake
             - switch.turn_off: backlight
           else:
-            - script.execute:
-                id: screen_wake
-                duration_s: 60
+            - if:
+                condition:
+                  switch.is_on: backlight_timeout
+                then:
+                  - script.execute:
+                      id: screen_wake
+                      duration_s: 60
+                else:
+                  # manual mode: plain on, stays on until toggled off
+                  - lambda: 'id(ttgo_display).update();'
+                  - switch.turn_on: backlight
 
   - id: splash_anim
     mode: restart
@@ -316,6 +330,27 @@ script:
                     id(screen_wake).execute(45);
                     id(splash_anim).execute();
                   }
+      - http_request.get:
+          url: "http://192.168.68.101:8889/api/timers/?limit=1"
+          request_headers:
+            Authorization: !secret babybuddy_token
+          capture_response: true
+          on_response:
+            then:
+              - lambda: |-
+                  if (response->status_code != 200) return;  // keep last known data
+                  json::parse_json(body, [](JsonObject root) -> bool {
+                    JsonArray results = root["results"];
+                    // BabyBuddy only lists running timers: empty = no timer
+                    if (results.size() == 0) {
+                      id(timer_start) = "";
+                      return true;
+                    }
+                    // "2026-07-08T15:43:11.155041+02:00" -> wall clock "15:43"
+                    std::string start = results[0]["start"].as<std::string>();
+                    id(timer_start) = start.size() >= 16 ? start.substr(11, 5) : "";
+                    return true;
+                  });
 
 interval:
   - interval: 1min             # backup poll; HA push handles the instant case
@@ -398,6 +433,10 @@ display:
         else snprintf(buf, len, "%ldh %ldm ago", mins / 60, mins % 60);
       };
       char buf[32];
+      if (!id(timer_start).empty()) {
+        std::string t = "timer " + id(timer_start);
+        it.print(it.get_width() - 6, 0, id(font_small), TextAlign::TOP_RIGHT, t.c_str());
+      }
       it.print(6, 0, id(font_small), id(c_feed), "Feeding");
       if (id(last_feed_ts) > 0) {
         if (now.is_valid()) {
