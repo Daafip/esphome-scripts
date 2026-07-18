@@ -105,7 +105,7 @@ number:
   step: 1
   unit_of_measurement: "%"
   optimistic: true
-  initial_value: 75
+  initial_value: 55
   on_value:
     then:
     - script.execute: apply_fan_state
