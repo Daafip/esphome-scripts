@@ -29,8 +29,8 @@ logger:
 api:
   encryption:
     key: !secret ttgo_ota_key
-  services:
-    - service: babybuddy_event
+  actions:
+    - action: babybuddy_event
       variables:
         feeding: bool
         wet: bool
@@ -50,7 +50,7 @@ api:
 
 ota:
   platform: esphome
-  password: !secret ota_password
+  encryption:
 
 wifi:
   manual_ip:
