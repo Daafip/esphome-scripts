@@ -23,7 +23,7 @@ api:
 
 ota:
   platform: esphome
-  password: !secret ota_password
+  encryption:
 
 wifi:
   # manual_ip:
@@ -237,7 +237,7 @@ light:
     default_transition_length: 0s
     chipset: SK6812
     num_leds: 1
-    rgb_order: grb
+    channel_colors: GRB
     effects:
       - pulse:
           name: "Slow Pulse"
