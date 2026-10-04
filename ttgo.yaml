@@ -4,6 +4,7 @@ substitutions:
   battery_full: '3.764128'
   battery_empty: '2.492'
   battery_diff: '1'
+  price_entity: sensor.vattenfall_dynamic_prices_stroom_all_in_forecast_24_uur
 
 esphome:
   name: ttgo
@@ -40,6 +41,7 @@ api:
             else if (wet && solid) id(splash_type) = 3;
             else if (solid)        id(splash_type) = 2;
             else                   id(splash_type) = 1;
+            id(page) = 0;   // baby event -> back to the Baby Buddy page
         - script.execute:
             id: screen_wake
             duration_s: 60
@@ -115,8 +117,8 @@ switch:
                   id: screen_wake
                   duration_s: 60
 
-# On-board buttons: toggle the screen
 binary_sensor:
+  # Top button: screen on/off
   - platform: gpio
     pin:
       number: GPIO0
@@ -129,6 +131,7 @@ binary_sensor:
     on_press:
       then:
         - script.execute: screen_toggle
+  # Bottom button: switch page (Baby Buddy <-> prices)
   - platform: gpio
     pin:
       number: GPIO35   # input-only pin, external pullup on board
@@ -136,7 +139,36 @@ binary_sensor:
     id: btn_bottom
     on_press:
       then:
-        - script.execute: screen_toggle
+        - script.execute: page_next
+
+# ---------- Electricity prices (from HA) ----------
+text_sensor:
+  # "11:00-12:00 0,26\n12:00-13:00 0,23\n..." -> price_hour / price_val
+  - platform: homeassistant
+    id: price_forecast
+    entity_id: ${price_entity}
+    attribute: forecast_text
+    internal: true
+    on_value:
+      then:
+        - lambda: |-
+            id(price_hour).clear();
+            id(price_val).clear();
+            size_t pos = 0;
+            while (pos < x.size()) {
+              size_t end = x.find('\n', pos);
+              if (end == std::string::npos) end = x.size();
+              std::string line = x.substr(pos, end - pos);
+              pos = end + 1;
+              int h, m;
+              size_t sp = line.find(' ');
+              if (sp == std::string::npos || sscanf(line.c_str(), "%d:%d", &h, &m) != 2) continue;
+              std::string v = line.substr(sp + 1);
+              for (auto &c : v) if (c == ',') c = '.';
+              id(price_hour).push_back(h);
+              id(price_val).push_back(strtof(v.c_str(), nullptr));
+            }
+            id(ttgo_display).update();
 
 globals:
   - id: last_feed_ts
@@ -159,6 +191,16 @@ globals:
     type: std::string
     restore_value: no
     initial_value: '""'
+  - id: page          # 0=Baby Buddy 1=prices
+    type: int
+    restore_value: no
+    initial_value: '0'
+  - id: price_hour    # start hour per block, first = current hour
+    type: std::vector<int>
+    restore_value: no
+  - id: price_val     # EUR/kWh per block
+    type: std::vector<float>
+    restore_value: no
 
 script:
   # Auto-wake for events/peeks: screen on for duration_s, then off again.
@@ -182,7 +224,7 @@ script:
                 then:
                   - switch.turn_off: backlight
 
-  # Button behavior:
+  # Top button behavior:
   #  timeout on : off -> on for 1 min, on -> off immediately
   #  timeout off: plain toggle
   - id: screen_toggle
@@ -205,6 +247,28 @@ script:
                   # manual mode: plain on, stays on until toggled off
                   - lambda: 'id(ttgo_display).update();'
                   - switch.turn_on: backlight
+
+  # Bottom button behavior:
+  #  screen off: wake on the current page (same as the top button)
+  #  screen on : next page; in timeout mode the 1-min timer restarts
+  - id: page_next
+    then:
+      - if:
+          condition:
+            switch.is_on: backlight
+          then:
+            - lambda: |-
+                id(page) = (id(page) + 1) % 2;
+                id(ttgo_display).update();
+            - if:
+                condition:
+                  switch.is_on: backlight_timeout
+                then:
+                  - script.execute:
+                      id: screen_wake
+                      duration_s: 60
+          else:
+            - script.execute: screen_toggle
 
   - id: splash_anim
     mode: restart
@@ -274,6 +338,7 @@ script:
                     return true;
                   });
                   if (trigger && !id(splash_anim).is_running()) {
+                    id(page) = 0;
                     id(screen_wake).execute(45);
                     id(splash_anim).execute();
                   }
@@ -327,6 +392,7 @@ script:
                     return true;
                   });
                   if (trigger && !id(splash_anim).is_running()) {
+                    id(page) = 0;
                     id(screen_wake).execute(45);
                     id(splash_anim).execute();
                   }
@@ -375,9 +441,15 @@ font:
   - file: "gfonts://Roboto@700"
     id: font_big
     size: 40
+  - file: "gfonts://Roboto@700"
+    id: font_mid       # price page header
+    size: 26
   - file: "gfonts://Roboto"
     id: font_small
     size: 18
+  - file: "gfonts://Roboto"
+    id: font_tiny      # price page labels
+    size: 12
   - file: "gfonts://Noto Emoji"
     id: font_emoji
     size: 70
@@ -408,7 +480,7 @@ display:
     lambda: |-
       auto now = id(ha_time).now();
 
-      // ---- splash animation ----
+      // ---- splash animation (overrides any page) ----
       if (id(splash_type) != 0) {
         int cx = it.get_width() / 2;
         int y = 34 + (int)(12 * sin(id(splash_frame) * 0.6f));
@@ -425,7 +497,68 @@ display:
         return;
       }
 
-      // ---- normal layout ----
+      // ---- page 1: electricity prices ----
+      if (id(page) == 1) {
+        auto &hrs = id(price_hour);
+        auto &val = id(price_val);
+        const int W = it.get_width();
+        if (val.empty()) {
+          it.print(W / 2, it.get_height() / 2, id(font_small), TextAlign::CENTER, "no price data");
+          return;
+        }
+        const size_t n = std::min<size_t>(val.size(), 24);
+        float mn = val[0], mx = val[0];
+        for (size_t i = 0; i < n; i++) { mn = std::min(mn, val[i]); mx = std::max(mx, val[i]); }
+
+        // Same scale as the HA integration: hsl(120 -> 0, 70%, 45%) from cheapest to most expensive
+        auto heat = [&](float v) -> Color {
+          int hue = mx > mn ? (int) (120.0f * (mx - v) / (mx - mn)) : 120;
+          float c = (1.0f - fabsf(2.0f * 0.45f - 1.0f)) * 0.70f;
+          float xx = c * (1.0f - fabsf(fmodf(hue / 60.0f, 2.0f) - 1.0f));
+          float m = 0.45f - c / 2.0f;
+          float r = hue < 60 ? c : xx, g = hue < 60 ? xx : c;
+          return Color((uint8_t) roundf((r + m) * 255), (uint8_t) roundf((g + m) * 255),
+                       (uint8_t) roundf(m * 255));
+        };
+        auto fmt = [](float v, char *b, size_t len) {
+          snprintf(b, len, "%.2f", v);
+          for (char *p = b; *p; p++) if (*p == '.') *p = ',';
+        };
+
+        // header: current price (left), min/max (right)
+        char b[16];
+        fmt(val[0], b, sizeof(b));
+        it.print(4, 0, id(font_mid), heat(val[0]), b);
+        int bx, by, bw, bh;
+        it.get_text_bounds(4, 0, b, id(font_mid), TextAlign::TOP_LEFT, &bx, &by, &bw, &bh);
+        it.print(bx + bw + 4, 12, id(font_tiny), "EUR/kWh nu");
+        fmt(mn, b, sizeof(b));
+        it.printf(W - 4, 2, id(font_tiny), TextAlign::TOP_RIGHT, "min %s", b);
+        fmt(mx, b, sizeof(b));
+        it.printf(W - 4, 16, id(font_tiny), TextAlign::TOP_RIGHT, "max %s", b);
+
+        // bars: fixed 24 slots so the time axis doesn't stretch
+        const int top = 36, bottom = 116, left = 4, right = W - 4;
+        const float lo = std::min(0.0f, mn), hi = std::max(mx, 0.01f);
+        auto ymap = [&](float v) { return top + (int) ((hi - v) / (hi - lo) * (bottom - top)); };
+        const float slot = (right - left) / 24.0f;
+        const int barw = std::max(1, (int) slot - 2);
+        const int yz = ymap(0.0f);
+        for (size_t i = 0; i < n; i++) {
+          int x0 = left + (int) (i * slot);
+          int yv = ymap(val[i]);
+          int y0 = std::min(yv, yz), h = std::max(1, std::abs(yz - yv));
+          it.filled_rectangle(x0, y0, barw, h, heat(val[i]));
+          if (i == 0)  // outline the current hour
+            it.rectangle(x0 - 1, y0 - 1, barw + 2, h + 2, Color(255, 255, 255));
+          if (hrs[i] % 3 == 0)
+            it.printf(x0 + barw / 2, bottom + 3, id(font_tiny), TextAlign::TOP_CENTER, "%02d", hrs[i]);
+        }
+        it.horizontal_line(left, yz, right - left, Color(90, 90, 90));
+        return;
+      }
+
+      // ---- page 0: Baby Buddy ----
       auto ago = [&](time_t ts, char *buf, size_t len) {
         long mins = (now.timestamp - ts) / 60;
         if (mins < 0) mins = 0;
