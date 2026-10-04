@@ -131,15 +131,25 @@ binary_sensor:
     on_press:
       then:
         - script.execute: screen_toggle
-  # Bottom button: switch page (Baby Buddy <-> prices)
+  # Bottom button: single = next price bar, double = switch page (Baby Buddy <-> prices)
   - platform: gpio
     pin:
       number: GPIO35   # input-only pin, external pullup on board
       inverted: true
     id: btn_bottom
-    on_press:
-      then:
-        - script.execute: page_next
+    on_multi_click:
+      - timing:
+          - ON for at most 1s
+          - OFF for at most 0.3s
+          - ON for at most 1s
+          - OFF for at least 0.2s
+        then:
+          - script.execute: page_next
+      - timing:
+          - ON for at most 1s
+          - OFF for at least 0.3s
+        then:
+          - script.execute: bar_next
 
 # ---------- Electricity prices (from HA) ----------
 text_sensor:
@@ -192,6 +202,10 @@ globals:
     restore_value: no
     initial_value: '""'
   - id: page          # 0=Baby Buddy 1=prices
+    type: int
+    restore_value: no
+    initial_value: '0'
+  - id: price_sel     # selected bar on the price page, 0 = current hour
     type: int
     restore_value: no
     initial_value: '0'
@@ -259,6 +273,7 @@ script:
           then:
             - lambda: |-
                 id(page) = (id(page) + 1) % 2;
+                id(price_sel) = 0;
                 id(ttgo_display).update();
             - if:
                 condition:
@@ -269,6 +284,30 @@ script:
                       duration_s: 60
           else:
             - script.execute: screen_toggle
+
+  # Bottom button single press:
+  #  screen off : wake (same as the top button)
+  #  price page : select next bar (wraps to the current hour)
+  #  other pages: next page
+  - id: bar_next
+    then:
+      - if:
+          condition:
+            lambda: 'return id(backlight).state && id(page) == 1;'
+          then:
+            - lambda: |-
+                int n = std::min<int>(id(price_val).size(), 24);
+                id(price_sel) = n > 0 ? (id(price_sel) + 1) % n : 0;
+                id(ttgo_display).update();
+            - if:
+                condition:
+                  switch.is_on: backlight_timeout
+                then:
+                  - script.execute:
+                      id: screen_wake
+                      duration_s: 60
+          else:
+            - script.execute: page_next
 
   - id: splash_anim
     mode: restart
@@ -525,13 +564,19 @@ display:
           for (char *p = b; *p; p++) if (*p == '.') *p = ',';
         };
 
-        // header: current price (left), min/max (right)
+        // selected bar (bottom button); data may have shrunk since it was picked
+        const size_t sel = id(price_sel) < (int) n ? id(price_sel) : 0;
+
+        // header: selected price (left), min/max (right)
         char b[16];
-        fmt(val[0], b, sizeof(b));
-        it.print(4, 0, id(font_mid), heat(val[0]), b);
+        fmt(val[sel], b, sizeof(b));
+        it.print(4, 0, id(font_mid), heat(val[sel]), b);
         int bx, by, bw, bh;
         it.get_text_bounds(4, 0, b, id(font_mid), TextAlign::TOP_LEFT, &bx, &by, &bw, &bh);
-        it.print(bx + bw + 4, 12, id(font_tiny), "EUR/kWh nu");
+        if (sel == 0)
+          it.print(bx + bw + 4, 12, id(font_tiny), "EUR/kWh nu");
+        else
+          it.printf(bx + bw + 4, 12, id(font_tiny), "EUR/kWh %02d:00", hrs[sel]);
         fmt(mn, b, sizeof(b));
         it.printf(W - 4, 2, id(font_tiny), TextAlign::TOP_RIGHT, "min %s", b);
         fmt(mx, b, sizeof(b));
@@ -549,7 +594,7 @@ display:
           int yv = ymap(val[i]);
           int y0 = std::min(yv, yz), h = std::max(1, std::abs(yz - yv));
           it.filled_rectangle(x0, y0, barw, h, heat(val[i]));
-          if (i == 0)  // outline the current hour
+          if (i == sel)  // outline the selected hour
             it.rectangle(x0 - 1, y0 - 1, barw + 2, h + 2, Color(255, 255, 255));
           if (hrs[i] % 3 == 0)
             it.printf(x0 + barw / 2, bottom + 3, id(font_tiny), TextAlign::TOP_CENTER, "%02d", hrs[i]);
